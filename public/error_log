@@ -1,0 +1,1 @@
+[22-Jun-2019 12:30:29 UTC] PHP Fatal error:  Cannot use empty array elements in arrays in /home/eworkglobal/public_html/property-management/app/Http/Controllers/API/General/PropertyController.php on line 307

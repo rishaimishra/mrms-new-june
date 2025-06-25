@@ -1,0 +1,1 @@
+{!! Form::select("grid[filter][{$column['field']}]", $column['filterable']['options'], request('grid.filter.' . $column['field']), ['class' => 'form-control form-control-sm', 'placeholder' => ('Select ' . $column['orig_label'])]) !!}

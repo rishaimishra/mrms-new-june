@@ -1,0 +1,209 @@
+@import url("https://fonts.googleapis.com/css2?family=Lora:wght@500&family=Poppins:wght@500&family=Roboto:wght@100;300&display=swap");
+
+@font-face {
+  font-family: "tarjan";
+  src: url("./font/TrajanPro-Regular.ttf");
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  outline: 0 !important;
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+}
+html {
+}
+body {
+  width: 100vw;
+  height: 100vh;
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  /* overflow: hidden; */
+  width: 1224px;
+  height: auto;
+  /* transform: translate(-50%, -50%); */
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.wrapper-main {
+  background-image: url(./bg.png);
+  background-repeat: no-repeat;
+  background-size: cover;
+  padding: 50px 40px 50px;
+}
+.wrapper {
+}
+.left {
+  width: 74%;
+  position: relative;
+}
+.left:after {
+  content: "";
+  display: block;
+  background-image: url(./badge.png);
+  background-size: contain;
+  width: 200px;
+  height: 200px;
+  background-repeat: no-repeat;
+  position: absolute;
+  top: 0;
+  left: auto;
+  right: 0;
+  transform: translateX(120px);
+}
+.title {
+  font-size: 32px;
+  text-transform: uppercase;
+  font-weight: 500;
+  color: #001555;
+  font-family: "Lora", serif;
+}
+#divider-line {
+}
+#divider-line img {
+  width: 520px;
+  height: auto;
+  margin: 15px 0 15px;
+}
+.cert-of-reg {
+  color: #e96a0f;
+  font-size: 28px;
+  font-weight: 600;
+  font-family: "Poppins", sans-serif;
+}
+.here-by {
+  font-weight: 100;
+  font-size: 24px;
+  font-family: "Roboto", sans-serif;
+}
+.card {
+  background: #edeeec;
+  padding: 35px 30px 35px;
+  margin: 20px 0px 50px;
+}
+.company-name {
+  font-size: 24px;
+  margin: 0 0 20px;
+  text-transform: uppercase;
+  color: #001554;
+  font-weight: 500;
+  font-family: "Lora", serif;
+}
+.comapny-info {
+}
+.comapny-info table {
+}
+.comapny-info table tr {
+}
+.comapny-info table td {
+  padding: 0 10px 7px 0;
+  font-family: "Roboto", sans-serif;
+  font-weight: 500;
+  font-size: 19px;
+}
+.comapny-info table td:nth-child(1) {
+}
+.comapny-info table td:nth-child(2) {
+}
+.comapny-info table td:nth-child(3) {
+}
+.cert-no-main {
+  display: flex;
+  font-weight: 600;
+  letter-spacing: 2px;
+}
+.cert-no-main > * {
+  margin-right: 20px;
+  font-family: "Poppins", sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+}
+.cert-1 {
+}
+.cert-2 {
+    /* transform: translateX(60%); */
+}
+.cert-3 {
+    float: right;
+}
+.cert-4 {
+    float: right;
+}
+.cert-5 {
+    float: right;
+}
+.bottom-seal {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-family: system-ui;
+  margin: 60px 0 0;
+}
+.sign-main {
+}
+.sign {
+  display: flex;
+  justify-content: center;
+}
+.sign img {
+  width: 130px;
+  margin: 0 0 7px 30px;
+}
+.cert-on-line .under-line {
+  margin: 0px 0 0px;
+  border-top-width: 0px;
+  border-style: solid;
+}
+.sign-post {
+}
+.seal-time,
+.sign-post {
+  font-weight: 100;
+  font-family: serif;
+  color: #001555;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 5px 0 0;
+  font-family: "Lora", serif;
+}
+.seal-main {
+    /* float: right;
+     */
+}
+.seal-main .under-line {
+  display: none;
+}
+.seal {
+    float: right;
+  /* display: flex; */
+  justify-content: center;
+}
+.seal img {
+  width: 70px;
+  margin: 0 0 0px;
+}
+.under-line {
+  border-top-color: #575756;
+}
+.seal-time {
+    float: right;
+    margin-top: 90px;
+    transform: translateX(60%);
+}
+.right {
+}
+.cert-on-line {
+  transform: translateY(-50%);
+  width: 100px;
+  text-align: center;
+  font-weight: 500;
+  font-family: "Lora", serif;
+  color: #001555;
+}

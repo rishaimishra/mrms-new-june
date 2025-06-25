@@ -1,0 +1,589 @@
+<?php
+
+namespace App\Http\Controllers\Admin;
+
+use App\Http\Controllers\Controller;
+use App\Models\Property;
+use App\Models\PropertyGeoRegistry;
+use App\Models\District;
+use App\Jobs\PropertyStickers;
+use App\Models\PropertyPayment;
+use App\Notifications\PaymentSMSNotification;
+use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Mail;
+use App\Models\PaymentAjdustDetails;
+
+class PaymentController extends Controller
+{
+    public function show(Request $request)
+    {
+        $property = [];
+        $last_payment = null;
+        $paymentInQuarter = [];
+        $history = [];
+
+        if (
+            $request->input('digital_address')
+            || $request->input('old_digital_address')
+            || $request->input('property_id')
+        ) {
+
+            $address = explode('%', $request->input('digital_address') ? $request->input('digital_address') : $request->input('old_digital_address'));
+
+            if ($request->filled('property_id')) {
+                $address[0] = $request->input('property_id');
+            }
+
+            $PropertyGeoRegistry = PropertyGeoRegistry::with(['property'])->whereHas('property', function ($query) use ($request, $address) {
+                return $query->where('id', $address[0]);
+            })->first();
+
+            if ($PropertyGeoRegistry && $request->input('old_digital_address') && $address[1] != $PropertyGeoRegistry->digital_address && $PropertyGeoRegistry->old_digital_address != $PropertyGeoRegistry->digital_address) {
+                return redirect()->route('admin.payment')->with($this->setMessage('Digital Address has been updated. Please print new demand draft and search by new digital address.', self::MESSAGE_SUCCESS));
+            }
+            if (request()->user()->hasRole('Super Admin')) {
+                if ($PropertyGeoRegistry) {
+                    $property = Property::with([
+                        'landlord',
+                        'occupancy',
+                        'assessment',
+                        'geoRegistry',
+                        'assessmentHistory'
+                    ])->find($PropertyGeoRegistry->property->id);
+                    if ($property) {
+                        $paymentInQuarter = $property->getPaymentsInQuarter();
+                    }
+                } else {
+                    $property = new Property();
+                    $paymentInQuarter = array();
+                }
+            } else {
+                if ($PropertyGeoRegistry) {
+                    $property = Property::where('district', request()->user()->assign_district)->with([
+                        'landlord',
+                        'occupancy',
+                        'assessment',
+                        'geoRegistry',
+                        'assessmentHistory'
+                    ])->find($PropertyGeoRegistry->property->id);
+                    if ($property) {
+                        $paymentInQuarter = $property->getPaymentsInQuarter();
+                    }
+                } else {
+                    $property = new Property();
+                    $paymentInQuarter = array();
+                }
+            }
+        }
+
+        $propertyId = $request->input('property_id');
+
+        $pensioner_image_path = PropertyPayment::where('property_id','=',$propertyId)->whereNotNull('pensioner_discount_image')->orderBy('created_at','desc')->first();
+
+        $disability_image_path = PropertyPayment::where('property_id','=',$propertyId)->whereNotNull('disability_discount_image')->orderBy('created_at','desc')->first();
+
+
+        $digital_address = PropertyGeoRegistry::distinct()->orderBy('property_id')->pluck('digital_address', 'digital_address')->sort()->prepend('Select Digital Address', '');
+
+        return view('admin.payments.view', compact('property', 'digital_address', 'paymentInQuarter', 'history','pensioner_image_path','disability_image_path'));
+    }
+
+    public function store($id, Request $request)
+    {
+        // dd($id,$request->all());
+        // PaymentAjdustDetails
+        $property = Property::with('landlord')->findOrFail($id);
+
+        $this->validate($request, [
+            'amount' => 'required',
+            'penalty' => 'nullable',
+            'payment_type' => 'required|in:cash,cheque',
+            'cheque_number' => 'nullable|required_if:payment_type,cheque|digits_between:5,10',
+            'payee_name' => 'required|max:250'
+        ]);
+
+        $t_amount = intval(str_replace(',', '', $request->total));
+        //$t_penalty = intval(str_replace(',', '', $request->input('penalty', 0)));
+
+        $t_penalty = 0;
+
+        $balance = number_format($property->getBalance(), 0, '.', '');
+
+        //        if ($property->payments()->count() >= 3) {
+        //            $amount = $t_amount;
+        //
+        //            if ( $balance != $amount && $balance > 0) {
+        //                return redirect()->back()->with($this->setMessage('You should deposit all the remaining amount in this month only.', self::MESSAGE_ERROR))->withInput();
+        //            }
+        //        }
+
+        $admin = $request->user('admin');
+
+        $data = $request->only([
+            'payment_type',
+            'cheque_number',
+            'payee_name'
+        ]);
+
+        $data['assessment'] = number_format($property->assessment->getCurrentYearTotalDue(), 0, '.', '');
+        $data['admin_user_id'] = $admin->id;
+        $data['total'] = $t_amount + $t_penalty;
+        $data['amount'] = $t_amount;
+        $data['balance'] = $data['assessment']; // For Activity log tracking
+        //$data['penalty'] = $t_penalty;
+
+        $payment = $property->payments()->create($data);
+        $payment->save();
+
+        $property2 = Property::with('landlord')->findOrFail($id);
+        $t_balance = number_format($property2->assessment->getCurrentYearTotalDue(), 0, '.', '');
+
+        $payment->balance = $t_balance;
+
+        $payment->save();
+
+        if ($mobile_number = $property->landlord->mobile_1) {
+            //$property->landlord->notify(new PaymentSMSNotification($property, $mobile_number, $payment));
+            if (preg_match('^(\+)([1-9]{3})(\d{8})$^', $mobile_number)) {
+                $property->landlord->notify(new PaymentSMSNotification($property, $mobile_number, $payment));
+            }
+        }
+
+
+        //new code to insert adjustable amount datas in PaymentAjdustDetails table if yr is not curent yr
+        if($request->adjust_year!=(int)date('Y')){
+            if(@$request->image){
+              $image = @$request->image;
+              $filename = time() . '-' . rand(1000, 9999) . '.' . $image->getClientOriginalExtension();
+              $image->move("storage/app/public/adjustPayment",$filename);
+            }
+
+            $ins= new PaymentAjdustDetails;
+            $ins->property_id=$id;
+            $ins->payment_id=$payment->id;
+            $ins->year=$request->adjust_year;
+            $ins->paying_amount=$request->amount;
+            $ins->adjust_amount=$request->adjust_amount;
+            $ins->total_amount=$request->total;
+            $ins->image=$filename;
+            $ins->comment=$request->comment;
+            $ins->save();
+        }
+
+        return redirect()->route('admin.payment.pos.receipt', ['id' => $property->id, 'payment_id' => $payment->id]);
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+    public function getReceipt($id, $year = null)
+    {
+        $year = !$year ? date('Y') : $year;
+
+        $property = Property::with('assessment', 'occupancy', 'types', 'geoRegistry', 'user')->findOrFail($id);
+        $assessment = $property->assessments()->whereYear('created_at', $year)->firstOrFail();
+
+        $assessment->setPrinted();
+
+        //        $pdf = \PDF::loadView('admin.payments.receipt');
+        //        return $pdf->download('invoice.pdf');
+
+        $paymentInQuarter = $property->getPaymentsInQuarter($year);
+        $district = District::where('name', $property->district)->first();
+        $pdf = \PDF::loadView('admin.payments.receipt', compact('property', 'paymentInQuarter', 'assessment', 'district'));
+
+
+        // return view('admin.payments.receipt', compact('property', 'paymentInQuarter', 'assessment', 'district'));
+
+        // return $pdf->download(Carbon::now()->format('Y-m-d-H-i-s') . '.pdf');
+
+
+    }
+
+    public function getAssessmentLandlordPdf($id, Request $request){
+        // dd($request->all());
+        $assed_value_2019=$request->assed_value_19;
+        $assed_value_2020=$request->assed_value_20;
+        $assed_value_2021=$request->assed_value_21;
+        $assed_value_2022=$request->assed_value_22;
+        $arrays_2019=$request->arrays_19;
+        $arrays_2020=$request->arrays_20;
+        $arrays_2021=$request->arrays_21;
+        $arrays_2022=$request->arrays_22;
+        $panelty_2019=$request->panelty_19;
+        $panelty_2020=$request->panelty_20;
+        $panelty_2021=$request->panelty_21;
+        $panelty_2022=$request->panelty_22;
+        $due_2019=$request->due_19;
+        $due_2020=$request->due_20;
+        $due_2021=$request->due_21;
+        $due_2022=$request->due_22;
+
+        $property = Property::with('assessment', 'occupancy', 'types', 'geoRegistry', 'user','landlord')->findOrFail($id);
+        // $property2 = Property::with('landlord')->findOrFail($id);
+       
+        // $assessment = $property->assessments()->firstOrFail();
+
+        // $assessment->setPrinted();
+        // // resources\views\admin\properties\printassesland.blade.php
+        // $district = District::where('name', $property->district)->first();
+         // Get default limit
+         $normalTimeLimit = ini_get('max_execution_time');
+
+         // Restore default limit
+         ini_set('max_execution_time', "2000"); 
+             
+         
+         // Get default limit
+         $normalMemoryLimit = ini_get('memory_limit');
+
+
+         // Restore default limit
+         ini_set('memory_limit', "2G"); 
+         
+        // $pdf = \PDF::loadView('admin.properties.printassesland', compact('property','assed_value_2019','assed_value_2020','assed_value_2021','assed_value_2022','arrays_2019','arrays_2020','arrays_2021','arrays_2022','panelty_2019','panelty_2020','panelty_2021','panelty_2022','due_2019','due_2020','due_2021','due_2022'));
+
+
+          return view('admin.properties.printassesland', compact(  'property','assed_value_2019','assed_value_2020','assed_value_2021','assed_value_2022','arrays_2019','arrays_2020','arrays_2021','arrays_2022','panelty_2019','panelty_2020','panelty_2021','panelty_2022','due_2019','due_2020','due_2021','due_2022'));
+
+        return $pdf->download(Carbon::now()->format('Y-m-d-H-i-s') . '.pdf');
+
+
+
+    }
+
+
+
+
+    public function getReceiptTwo($id, $year = null,Request $request)
+    {
+       // dd($id,$year,$request->all());
+
+       //calculatd all datas for all years
+       //-----------------get all details o sent in sms for each property
+        $blankArray=[];
+
+                  $property = Property::find($id);
+
+                //part 1
+                    $CurrentYearAssessmentAmount = 0;
+                    $PastPayableDue = 0;
+                    $Penalty = 0;
+                    $CurrentYearTotalPayment2021 = 0;
+                    $CurrentYearTotalDue = 0;
+                    $CurrentYearTotalDue2021 = 0;
+
+                    $PastPayableDue2022 = 0;
+                    $CurrentYearTotalPayment2022 = 0;
+                    $Penalty2022 = 0;
+                    $CurrentYearTotalDue2022 = 0;
+                    $PastPayableDue = 0;
+
+                 // part -2
+                for($i=0; $i<count(@$property->assessmentHistory); $i++){
+   
+                    $AssessmentYear = $property->assessmentHistory[$i]->created_at->year;
+                    $CurrentYearAssessmentAmount = $property->assessmentHistory[$i]->current_year_assessment_amount;
+                    if($PastPayableDue > 0){
+                        $Penalty = $PastPayableDue*0.25;
+                    }
+                    else{
+                        $Penalty =0;
+                    }
+                    
+                    $CurrentYearTotalPayment = $property->assessmentHistory[$i]->getCurrentYearTotalPayment();
+                    $CurrentYearTotalDue =$CurrentYearAssessmentAmount+$PastPayableDue+$Penalty - $CurrentYearTotalPayment;
+                   
+                    
+                  $arr2=[];
+                  $arr2['propertyId']= $id;
+    
+                 $arr2['AssessmentYear']=$AssessmentYear ;
+                 $arr2['CurrentYearAssessmentAmount']= $CurrentYearAssessmentAmount;
+                 $arr2['PastPayableDue']= $PastPayableDue;
+                 $arr2['Penalty']= $Penalty;
+                 $arr2['CurrentYearTotalPayment']= $CurrentYearTotalPayment;
+                 $arr2['CurrentYearTotalDue']= $CurrentYearTotalDue;
+
+                 if($AssessmentYear!="2023"){
+                       $PastPayableDue = $CurrentYearTotalDue;
+                     }
+
+                 array_push($blankArray,$arr2);
+               
+                }
+                // dd($AssessmentYear,$CurrentYearAssessmentAmount,$Penalty,$PastPayableDue,$CurrentYearTotalPayment,$CurrentYearTotalDue,$blankArray);
+                foreach($blankArray as $val){
+                    if($val['AssessmentYear']==$request->year){
+                        // dd($val,$request->year);
+                        @$yr=$request->year;
+                        $assed_value=$val['CurrentYearAssessmentAmount'];
+                        $arrays=$val['PastPayableDue'];
+                        $panelty_new=$val['Penalty'];
+                        $payments=$val['CurrentYearTotalPayment'];
+                        $due=$val['CurrentYearTotalDue'];
+
+             }
+                }
+
+
+// dd(
+// $yr,
+// $assed_value,
+// $arrays,
+// $panelty_new,
+// $payments,
+// $due);
+       
+
+
+
+        // @$yr=$request->year;
+        // $assed_value=$request->assed_value;
+        // $arrays=$request->arrays;
+        // $panelty_new=$request->panelty;
+        // $payments=$request->payments;
+        // $due=$request->due;
+        $year = !$year ? date('Y') : $year;
+
+        $property = Property::with('assessment', 'occupancy', 'types', 'geoRegistry', 'user')->findOrFail($id);
+        $assessment = $property->assessments()->whereYear('created_at', $yr)->firstOrFail();
+
+        $assessment->setPrinted();
+
+        //        $pdf = \PDF::loadView('admin.payments.receipt');
+        //        return $pdf->download('invoice.pdf');
+
+        $paymentInQuarter = $property->getPaymentsInQuarter($yr);
+        $district = District::where('name', $property->district)->first();
+        $pdf = \PDF::loadView('admin.payments.receipt', compact('property', 'paymentInQuarter', 'assessment', 'district','yr','assed_value','arrays','panelty_new','payments','due'));
+
+
+        //  return view('admin.payments.receipt', compact('property', 'paymentInQuarter', 'assessment', 'district','yr','assed_value','arrays','panelty_new','payments','due'));
+
+        return $pdf->download(Carbon::now()->format('Y-m-d-H-i-s') . '.pdf');
+
+
+    }
+
+
+
+
+
+
+
+
+
+    public function emailReceipt($id, $year = null)
+    {
+        $year = !$year ? date('Y') : $year;
+
+        $property = Property::with('assessment', 'occupancy', 'types', 'geoRegistry', 'user')->findOrFail($id);
+        if ($property->landlord->email) {
+            Mail::send('vendor.mail.html.receipt', ['name' => $property->landlord->getName(), 'year' => $year], function ($message) use ($property, $year) {
+
+                $assessment = $property->assessments()->whereYear('created_at', $year)->firstOrFail();
+
+                $assessment->setPrinted();
+
+                $paymentInQuarter = $property->getPaymentsInQuarter($year);
+                $district = District::where('name', $property->district)->first();
+                $pdf = \PDF::loadView('admin.payments.receipt', compact('property', 'paymentInQuarter', 'assessment', 'district'));
+
+                $message->to($property->landlord->email, $property->landlord->getName())->subject('WARDC - Demand Note');
+
+                $message->from('no-reply@sigmaventuressl.com', 'WARDC');
+
+                $message->attachData($pdf->output(), 'DemandNote.pdf');
+            });
+            return back()->with('success', 'Email successfully sent.');
+        } else {
+            return back()->with('error', 'Email address not found.');
+        }
+    }
+
+    public function getStickers($id, $year = null, Request $request)
+    {
+        $year = !$year ? date('Y') : $year;
+
+        $request->request->set('demand_draft_year', $year);
+
+        $nProperty = Property::with([
+            'user',
+            'landlord',
+            'assessment' => function ($query) use ($year) {
+                if ($year) {
+                    $query->whereYear('created_at', $year);
+                }
+            },
+            'geoRegistry',
+            'user',
+            'occupancies',
+            'propertyInaccessible',
+            'payments'
+        ])->where('properties.id', $id)
+            ->withAssessmentCalculation($year)
+            ->having('total_payable_due', 0)
+            ->orderBy('total_payable_due')->get();
+
+        $stickers = new PropertyStickers();
+        //dd($nProperty);
+        return $stickers->handle($nProperty, $request);
+    }
+
+    public function getPosReceipt($id, $payment_id)
+    {
+        $property = Property::findOrFail($id);
+
+        //        $pdf = \PDF::loadView('admin.payments.receipt');
+        //        return $pdf->download('invoice.pdf');
+
+        $paymentInQuarter = $property->getPaymentsInQuarter();
+
+        $payment = $property->payments()->findOrFail($payment_id);
+
+        $property->load([
+            'assessment' => function ($query) use ($payment) {
+                $query->whereYear('created_at', $payment->created_at->format('Y'));
+            },
+            'occupancy',
+            'types',
+            'geoRegistry',
+            'landlord'
+        ]);
+
+        return view('admin.payments.pos-receipt', compact('property', 'paymentInQuarter', 'payment'));
+    }
+
+    public function edit($id)
+    {
+        $payment = PropertyPayment::findOrFail($id);
+
+        $propertyId = PropertyPayment::where('id',$id)->value('property_id');
+        
+        $pensioner_image_path = PropertyPayment::where('property_id','=',$propertyId)->whereNotNull('pensioner_discount_image')->orderBy('created_at','desc')->first();
+
+        $disability_image_path = PropertyPayment::where('property_id','=',$propertyId)->whereNotNull('disability_discount_image')->orderBy('created_at','desc')->first();
+
+        $property = $payment->property;
+
+        return view('admin.payments.edit', compact('payment', 'property','pensioner_image_path','disability_image_path'));
+    }
+
+    public function verify($id)
+    {
+        $payment = PropertyPayment::findOrFail($id);
+
+        $property = $payment->property;
+
+        return view('admin.payments.verify', compact('payment', 'property'));
+    }
+    public function update($id, Request $request)
+    {
+        $payment = PropertyPayment::findOrFail($id);
+
+        $property = $payment->property;
+
+
+        $this->validate($request, [
+            'assessment' => 'required',
+            'amount' => 'required',
+            //'penalty' => 'nullable',
+            'payment_type' => 'required|in:cash,cheque',
+            'cheque_number' => 'nullable|required_if:payment_type,cheque|digits_between:5,10',
+            'payee_name' => 'required|max:250',
+            'created_at' => 'required',
+        ]);
+
+        $t_amount = intval(str_replace(',', '', $request->amount));
+        //$t_penalty = intval(str_replace(',', '', $request->penalty));
+        $t_penalty = 0;
+        $t_assessment = intval(str_replace(',', '', $request->assessment));
+        $admin = $request->user('admin');
+
+        $data = $request->only([
+            'payment_type',
+            'cheque_number',
+            'payee_name',
+            'pensioner_discount_approve',
+            'disability_discount_approve'
+        ]);
+
+
+        $data['admin_user_id'] = $admin->id;
+        $data['total'] = $t_amount + $t_penalty;
+        $data['amount'] = $t_amount;
+        $data['assessment'] = $t_assessment;
+        $data['created_at'] = $request->created_at;
+        $data['updated_at'] = $request->created_at;
+        $data['balance'] = $t_assessment - ($t_amount + $t_penalty);
+
+
+        $payment->fill($data);
+        $payment->created_at = $request->created_at;
+        $payment->updated_at = $request->created_at;
+        $payment->save(['timestamps' => false]);
+
+        //$this->updatePayments($property, $payment);
+        return redirect()->route('admin.payment', ['property_id' => $property->id])->with($this->setMessage('Transaction successfully done.', self::MESSAGE_SUCCESS));
+        //return back()->with($this->setMessage('Transaction successfully done.', self::MESSAGE_SUCCESS));
+    }
+
+    public function updatePayments($property, $payment)
+    {
+        $totalPaid = $property->payments()->orderBy('created_at', 'asc')->where('id', '<=', $payment->id)->sum('amount');
+        $balance = $property->assessments->sum('property_rate_without_gst') - $totalPaid;
+
+        $payment->balance = $balance;
+        $payment->save();
+
+
+        //        if ($payments->count() && $payments->count() != 1) {
+        //            foreach ($payments as  $payment) {
+        //                $previous = $this->getPreviousPayment($property, $payment);
+        //
+        //                if ($previous) {
+        //                    $payment->balance = $previous->balance - $payment->amount;
+        //                    $payment->save();
+        //                } else {
+        //                    $payment->balance = $payment->assessment - $payment->amount;
+        //                }
+        //
+        //                $payment->save();
+        //            }
+        //        }
+
+        return;
+    }
+
+    public function getPreviousPayment($property, $payment)
+    {
+        $previous = $property->payments()->where('id', '>', $payment->id)->orderBy('id', 'desc')->first();
+
+        return $previous;
+    }
+
+    public function delete($id)
+    {
+        $payment = PropertyPayment::findOrFail($id);
+
+        $property = $payment->property;
+
+        $payment->delete();
+
+        //$this->updatePayments($property, $id);
+
+        return back()->with($this->setMessage('Payment successfully deleted', 2));
+    }
+}
+

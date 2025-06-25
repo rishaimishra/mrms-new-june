@@ -1,0 +1,11 @@
+.env
+vendor
+storage
+/public/storage
+/public/admin
+/public/business_images
+/public/images
+public/properties_images
+public/busniess_images
+database/migrations
+.env.server

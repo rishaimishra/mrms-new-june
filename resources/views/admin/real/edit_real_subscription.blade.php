@@ -1,0 +1,123 @@
+@extends('admin.layout.edit')
+
+@section('content')
+<style>
+    .bootstrap-select.btn-group .dropdown-menu{
+           width:100% !important;
+       }
+       .bootstrap-select .bs-searchbox .form-control, .bootstrap-select .bs-actionsbox .form-control, .bootstrap-select .bs-donebutton .form-control{
+           margin-left:0px !important;
+       }
+       .bootstrap-select .bs-searchbox:after{
+           display: none;
+       }
+       .bootstrap-select.btn-group .dropdown-toggle .caret{
+           left: 0px;
+       }
+       #images{
+           width:100%;
+       }
+</style>
+<?php
+$subscription = [
+    ''  => 'Select subscription',
+    0.00 => '0.00',
+    10.00 => '10.00',
+    15.00 => '15.00',
+    25.00 => '25.00',
+    50.00 => '50.00',
+    100.00 => '100.00',
+    250.00 => '250.00',
+    500.00 => '500.00',
+    750.00 => '750.00',
+    1000.00 => '1000.00',
+    1500.00 => '1500.00',
+    2500.00 => '2500.00',
+    5000.00 => '5000.00',
+];
+$ref_fee = [
+    ''  => 'Select percentage',
+    0.00 => '0.00',
+    5.00 => '5.00',
+    7.50 => '7.50',
+    10.00 => '10.00',
+    12.50 => '12.50',
+    15.00 => '15.00',
+    17.50 => '17.50',
+    20.00 => '20.00',
+    25.00 => '25.00',
+];
+$selectedValue = (float) old('go_plan_monthly', $edsa_subscription->go_plan_monthly ?? '0.00');
+$selectedValue_ind = (float) old('individual_plan_monthly', $edsa_subscription->individual_plan_monthly ?? '0.00');
+$selectedValue_bus = (float) old('business_plan_monthly', $edsa_subscription->business_plan_monthly ?? '0.00');
+$selectedper = (float) old('go_plan_referal_fee', $edsa_subscription->go_plan_referal_fee ?? '0.00');
+$selectedper_ind = (float) old('individual_plan_referal_fee', $edsa_subscription->individual_plan_referal_fee ?? '0.00');
+$selectedper_bus = (float) old('business_plan_referal_fee', $edsa_subscription->business_plan_referal_fee ?? '0.00');
+$users = [
+    ''  => 'Select Users',
+    1 => 'Bilal',
+];
+$role = [
+    ''  => 'Select Role',
+    'business_owner' => ' EDSA - Business Owner',
+    'business_partner' => ' Business Partner (For Businesses)',
+    'dealer' => ' Dealer',
+    'agent' => ' Agent',
+];
+?>
+<div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
+    <div class="card">
+        <div class="header">
+            <h2>Edit Subscription fee</h2>
+        </div>
+        <form action="{{ route('admin.realsubscription-update') }}" method="POST">
+            @csrf
+            <input type="hidden" name="subscription_id" value="{{ $edsa_subscription->id }}">
+        <div class="body">
+            <div class="row">
+                <div class="col-sm-6">
+                    <label class="form-label">Users</label>
+                    <br>
+                    {!! Form::select('users', $users_seller, ['class' => 'form-control', 'id' => 'users', 'data-live-search' => 'true']) !!}
+                </div>
+                <div class="col-sm-6">
+                    <label class="form-label">Role</label>
+                    <br>
+                    {!! Form::select('role', $role, old('role',optional($edsa_subscription)->role), ['class' => 'form-control', 'id' => 'role', 'data-live-search' => 'true']) !!}
+                </div>
+                <div class="col-sm-6">
+                    <label class="form-label">Pay As You Go plan subscription fee (NLe)</label><br>
+                    {!! Form::select('go_plan_monthly', $subscription,$selectedValue, ['class' => 'form-control', 'id' => 'go_plan_monthly', 'data-live-search' => 'true']) !!}
+                   
+                </div>
+                <div class="col-sm-6">
+                    <label class="form-label">Pay As You Go plan refferal fee (%)</label>
+                    {!! Form::select('go_plan_referal_fee', $ref_fee, $selectedper, ['class' => 'form-control', 'id' => 'go_plan_referal_fee', 'data-live-search' => 'true']) !!}
+                    
+                </div>
+                <div class="col-sm-6">
+                    <label class="form-label">MSME plan subscription fee (NLe)</label>
+                    {!! Form::select('individual_plan_monthly', $subscription, $selectedValue_ind, ['class' => 'form-control', 'id' => 'individual_plan_monthly', 'data-live-search' => 'true']) !!}
+                    
+                </div>
+                <div class="col-sm-6">
+                    <label class="form-label">MSME plan refferal fee (%)</label>
+                    {!! Form::select('individual_plan_referal_fee', $ref_fee, $selectedper_ind, ['class' => 'form-control', 'id' => 'individual_plan_referal_fee', 'data-live-search' => 'true']) !!}
+                    
+                </div>
+                <div class="col-sm-6">
+                    <label class="form-label">Business plan subscription fee (NLe)</label>
+                    {!! Form::select('business_plan_monthly', $subscription, $selectedValue_bus, ['class' => 'form-control', 'id' => 'business_plan_monthly', 'data-live-search' => 'true']) !!}
+                   
+                </div>
+                <div class="col-sm-6">
+                    <label class="form-label">Business Plan refferal fee (%)</label>
+                    {!! Form::select('business_plan_referal_fee', $ref_fee, $selectedper_bus, ['class' => 'form-control', 'id' => 'business_plan_referal_fee', 'data-live-search' => 'true']) !!}
+                   
+                </div>
+                <button type="submit" class="btn btn-primary">Save</button>
+            </div>
+        </div>
+    </form>
+    </div>
+    @stop
