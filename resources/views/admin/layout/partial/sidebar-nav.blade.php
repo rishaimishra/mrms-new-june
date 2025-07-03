@@ -209,7 +209,7 @@
             </a>
         </li>
         <li class="">
-            <a class="waves-effect waves-block" href="{{route('admin.show-seller-product')}}">
+            <a class="waves-effect waves-block" href="{{route('admin.show-realestate-product-list')}}">
             <i class="material-icons">shopping_basket</i>
                 <span>My Properties</span>
             </a>

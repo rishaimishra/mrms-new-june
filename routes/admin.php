@@ -47,6 +47,9 @@ Route::get('national_news_detail/{id}', 'UtilityExtendController@national_news_d
 Route::get('sellerLogin', [SellerLoginController::class,'showForm'])->name('seller.login.form'); 
 Route::post('sellerLogin', [SellerLoginController::class,'login'])->name('seller.login');
 Route::get('sellerLogout', [SellerLoginController::class,'logout'])->name('seller.logout');
+Route::get('imageDeleteSeller/auto/{id?}', 'Auto\AutoSellerController@imageDelete');
+    Route::get('imagebgDeleteSeller/auto/{id?}', 'Auto\AutoSellerController@imagebgDelete');
+    Route::get('imageDelete/real-estate-seller/{id?}', 'Auto\AutoSellerController@realSellerImagedelete');
 Route::group(['as' => 'auth.', 'namespace' => 'Auth'], function () {
 
     Route::get('login', 'LoginController@showForm')->name('login');
@@ -75,6 +78,7 @@ Route::get('/seller/product', function () {
 Route::get('/show-seller-product', 'ProductSeller\ProductSellerController@index')->name('show-seller-product');
 Route::get('/show-auto-product', 'ProductSeller\ProductSellerController@Autoindex')->name('show-auto-product');
 Route::get('/show-realestate-product', 'ProductSeller\ProductSellerController@PropertyIndex')->name('show-realestate-product');
+Route::get('/show-realestate-product-list', 'ProductSeller\ProductSellerController@PropertyIndexList')->name('show-realestate-product-list');
 Route::get('delete_product/{id}', 'ProductSeller\ProductSellerController@productDestroy')->name('delete-product-seller');
 Route::get('edit_product/{id}/{type}', 'ProductSeller\ProductSellerController@product_edit')->name('edit-product-seller');
 Route::get('edit_auto/{id}', 'Auto\AutoSellerController@auto_edit')->name('edit-auto-seller');
@@ -87,6 +91,7 @@ Route::get('/edit-myauto/{id}', 'Auto\AutoSellerController@MyAutoedit')->name('e
 Route::post('/edit-myauto/{id}', 'Auto\AutoSellerController@MyAutoeditsave')->name('edit-auto.seller.save');
 
 Route::post('update_product', 'ProductSeller\ProductSellerController@update_product')->name('update-product-seller');
+Route::post('update_property', 'Auto\AutoSellerController@updateProperty')->name('update-property-seller');
 
 Route::get('/edit-product/{id}', 'ProductSeller\ProductSellerController@MyProductedit')->name('edit-product.seller');
 Route::patch('/update-product/{id}', 'ProductSeller\ProductSellerController@updateMyProduct')
@@ -306,6 +311,10 @@ Route::group(['middleware' => 'auth:admin'], function () {
 
 
     Route::resource('ad-detail', 'AdDetailController');
+
+Route::get('ad-detail/{id}/editad', 'AdDetailController@editAd')->name('ad-detail.editad');
+Route::post('ad-detail/{id}/updatead', 'AdDetailController@updateAd')->name('ad-detail.updatead');
+
 
 
     Route::resource('product-category', 'Product\ProductCategoryController')->except('show');

@@ -47,6 +47,42 @@
                             
                         </div>
 
+                        <div class="row">
+                            <div class="col-sm-6">
+                        <div class="form-group form-float">
+                            <div class="form-line">
+                            <textarea class="form-control" name="description">{{ old('description') }}</textarea>
+                            <label class="form-label">Ad Description</label>
+
+                            </div>
+                            @if ($errors->has('ad_link'))
+                                    <label class="error">{{ $errors->first('ad_link') }}</label>
+                            @endif
+                        </div>
+                            </div>
+                            <div class="col-sm-6">
+
+                            </div>
+                            
+                       
+                            <div class="col-sm-6">
+                        <div class="form-group form-float">
+                            <div class="form-line">
+                            <input type="text" class="form-control" value="{{ old('sequence') }}" name="sequence">
+                            <label class="form-label">Sequence</label>
+                            
+                            </div>
+                            @if ($errors->has('ad_link'))
+                                    <label class="error">{{ $errors->first('ad_link') }}</label>
+                            @endif
+                        </div>
+                            </div>
+                            <div class="col-sm-6">
+
+                            </div>
+                            
+                        </div>
+
 
 
                         <div class="row">
@@ -54,10 +90,11 @@
                        
                             <div class="form-line">
                                 <label for="ad_type">Ad Type</label>
-                                <select id="ad_type" name="ad_type" size="3">
-                                    <option value="1">Small ad</option>
-                                    <option value="2">Banner</option>
-                                    
+                                <select id="ad_type" name="ad_type">
+                                    <option value="2" {{ old('ad_type', $adDetail->ad_type ?? '') == 2 ? 'selected' : '' }}>Banner</option>
+                                    <option value="1" {{ old('ad_type', $adDetail->ad_type ?? '') == 1 ? 'selected' : '' }}>Small Ad (Large)</option>
+                                    <option value="3" {{ old('ad_type', $adDetail->ad_type ?? '') == 3 ? 'selected' : '' }}>Small Ad (Medium)</option>
+                                    <option value="4" {{ old('ad_type', $adDetail->ad_type ?? '') == 4 ? 'selected' : '' }}>Small Ad (Small)</option>
                                 </select>
                                 <!-- <input type="text" class="form-control" value="{{ old('ad_type') }}"  required>
                                 <label class="form-label">Ad Type</label> -->

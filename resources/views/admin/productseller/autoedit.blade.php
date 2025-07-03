@@ -18,98 +18,107 @@
            width:100%;
        }
 </style>
-<div class="container">
-    <h2>{{ $auto ? 'Edit Auto' : 'Create New Auto' }}</h2>
-
-    <form action="{{ route('admin.save-auto', ['id' => $auto->id ?? null]) }}" method="POST" enctype="multipart/form-data">
-        @csrf
-       
-
-        <!-- Auto Name -->
-        <div class="form-group">
-            <label for="name">Auto Name</label>
-            <input type="text" class="form-control" id="name" name="name" value="{{ old('name', $auto->name ?? '') }}" required>
+<div class="row">
+    <div class="col-md-12">
+    <div class="card">
+        <div class="header">
+            <h2>{{ $auto ? 'Edit Auto' : 'Create New Auto' }}</h2>
         </div>
-
-        <!-- Images -->
-        <div class="form-group">
-            <label for="images">Auto Images</label>
-            <input type="file" class="form-control" id="images" name="images[]" accept="image/*" multiple>
-            <div id="image-preview" class="mt-2"></div> <!-- Preview Images -->
+        <div class="body">
+           
+                <form action="{{ route('admin.save-auto', ['id' => $auto->id ?? null]) }}" method="POST" enctype="multipart/form-data">
+                    @csrf
+                   
+            
+                    <!-- Auto Name -->
+                    <div class="form-group">
+                        <label for="name">Auto Name</label>
+                        <input type="text" class="form-control" id="name" name="name" value="{{ old('name', $auto->name ?? '') }}" required>
+                    </div>
+            
+                    <!-- Images -->
+                    <div class="form-group">
+                        <label for="images">Auto Images</label>
+                        <input type="file" class="form-control" id="images" name="images[]" accept="image/*" multiple>
+                        <div id="image-preview" class="mt-2"></div> <!-- Preview Images -->
+                    </div>
+            
+            
+                    <!-- Auto Title -->
+                    <div class="form-group">
+                        <label for="title">Auto Title</label>
+                        <input type="text" class="form-control" id="title" name="title" value="{{ old('title', $auto->title ?? '') }}" required>
+                    </div>
+            
+                    <!-- About Auto -->
+                    <div class="form-group">
+                        <label for="about">About</label>
+                        <textarea class="form-control" id="about" name="about">{{ old('about', $auto->about ?? '') }}</textarea>
+                    </div>
+            
+                    <!-- Attribute Set -->
+                    <div class="form-group">
+                        <label for="attribute_set_id">Attribute Set</label>
+                        <select class="form-control" id="attribute_set_id" name="attribute_set_id" disabled>
+                            <option value="">Select Attribute Set</option>
+                            @foreach ($attributeSets as $attributeSet)
+                                <option value="{{ $attributeSet->attribute_set_id }}" 
+                                    @if($auto && $auto->attribute_set_id == $attributeSet->attribute_set_id) selected @endif>
+                                    {{ $attributeSet->attribute_set_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+            
+                    <!-- Attribute Group -->
+                    <div class="form-group" id="attribute_group_section" style="{{ $auto ? 'display:block;' : 'display:none;' }}">
+                        <label for="attribute_group_id">Attribute Group</label>
+                        <select class="form-control" id="attribute_group_id" name="attribute_group_id" disabled>
+                            <option value="">Select Attribute Group</option>
+                            @foreach ($attributeGroups as $attributeGroup)
+                                <option value="{{ $attributeGroup->attribute_group_id }}" 
+                                    @if($auto && $auto->attribute_group_id == $attributeGroup->attribute_group_id) selected @endif>
+                                    {{ $attributeGroup->attribute_group_name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+            
+                    <!-- Attributes -->
+                    <div class="form-group" id="attributes_section" style="{{ $auto ? 'display:block;' : 'display:none;' }}">
+                        <label for="attribute_id">Attribute</label>
+                        <select class="form-control" id="attribute_id" name="attribute_id">
+                            <option value="">Select Attribute</option>
+                            @foreach ($attributes as $attribute)
+                                <option value="{{ $attribute->attribute_id }}" 
+                                    @if($auto && $auto->attribute_id == $attribute->attribute_id) selected @endif>
+                                    {{ $attribute->attribute_code }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+            
+                    <!-- Categories -->
+                    <div class="form-group">
+                        <label for="categories">Select Categories</label>
+                        <select class="form-control" id="categories" name="categories[]" multiple disabled>
+                            @foreach ($autoCategories as $category)
+                                <option value="{{ $category->id }}" 
+                                    @if(in_array($category->id, $autoCategoryIds)) selected @endif>
+                                    {{ $category->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </div>
+            
+            
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn btn-primary">Save Auto</button>
+                </form>
+            </div>
         </div>
-
-
-        <!-- Auto Title -->
-        <div class="form-group">
-            <label for="title">Auto Title</label>
-            <input type="text" class="form-control" id="title" name="title" value="{{ old('title', $auto->title ?? '') }}" required>
-        </div>
-
-        <!-- About Auto -->
-        <div class="form-group">
-            <label for="about">About</label>
-            <textarea class="form-control" id="about" name="about">{{ old('about', $auto->about ?? '') }}</textarea>
-        </div>
-
-        <!-- Attribute Set -->
-        <div class="form-group">
-            <label for="attribute_set_id">Attribute Set</label>
-            <select class="form-control" id="attribute_set_id" name="attribute_set_id" disabled>
-                <option value="">Select Attribute Set</option>
-                @foreach ($attributeSets as $attributeSet)
-                    <option value="{{ $attributeSet->attribute_set_id }}" 
-                        @if($auto && $auto->attribute_set_id == $attributeSet->attribute_set_id) selected @endif>
-                        {{ $attributeSet->attribute_set_name }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
-
-        <!-- Attribute Group -->
-        <div class="form-group" id="attribute_group_section" style="{{ $auto ? 'display:block;' : 'display:none;' }}">
-            <label for="attribute_group_id">Attribute Group</label>
-            <select class="form-control" id="attribute_group_id" name="attribute_group_id" disabled>
-                <option value="">Select Attribute Group</option>
-                @foreach ($attributeGroups as $attributeGroup)
-                    <option value="{{ $attributeGroup->attribute_group_id }}" 
-                        @if($auto && $auto->attribute_group_id == $attributeGroup->attribute_group_id) selected @endif>
-                        {{ $attributeGroup->attribute_group_name }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
-
-        <!-- Attributes -->
-        <div class="form-group" id="attributes_section" style="{{ $auto ? 'display:block;' : 'display:none;' }}">
-            <label for="attribute_id">Attribute</label>
-            <select class="form-control" id="attribute_id" name="attribute_id">
-                <option value="">Select Attribute</option>
-                @foreach ($attributes as $attribute)
-                    <option value="{{ $attribute->attribute_id }}" 
-                        @if($auto && $auto->attribute_id == $attribute->attribute_id) selected @endif>
-                        {{ $attribute->attribute_code }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
-
-        <!-- Categories -->
-        <div class="form-group">
-            <label for="categories">Select Categories</label>
-            <select class="form-control" id="categories" name="categories[]" multiple disabled>
-                @foreach ($autoCategories as $category)
-                    <option value="{{ $category->id }}" 
-                        @if(in_array($category->id, $autoCategoryIds)) selected @endif>
-                        {{ $category->name }}
-                    </option>
-                @endforeach
-            </select>
-        </div>
-
-
-        <!-- Submit Button -->
-        <button type="submit" class="btn btn-primary">Save Auto</button>
-    </form>
+    </div>
+   
 </div>
 
 @push('scripts')

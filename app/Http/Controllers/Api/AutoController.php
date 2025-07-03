@@ -6,6 +6,7 @@ use App\Logic\SystemConfig;
 use App\Mail\AutoInterested;
 use App\Models\AdminUser;
 use App\Models\Auto;
+use App\Models\AdDetail;
 use App\Models\AutoCategory;
 use Eav\Attribute;
 use Eav\AttributeGroup;
@@ -25,26 +26,68 @@ class AutoController extends ApiController
      */
     function getAutoCategory($id = null): JsonResponse
     {
-        $categories = AutoCategory::active()->where('parent_id', $id)
+        // Fetch categories
+        $categories = AutoCategory::active()
+            ->where('parent_id', $id)
             ->withCount('children')
             ->orderBy(DB::raw('sequence IS NULL, sequence'), 'asc')
             ->paginate(30);
-
+    
+        // Fetch system configuration
         $sponsorAll = SystemConfig::getOptionGroup(SystemConfig::SPONSOR_GROUP);
-
+    
+        // Default custom sponsor
         $custom = collect(['sponsor' => $sponsorAll->{SystemConfig::AUTO_SPONSOR}]);
-
+    
+        // Update sponsor text if $id is provided
         if ($id) {
             $autoCategory = AutoCategory::active()->where('id', $id)->first();
-            $custom = $autoCategory->sponsor_text ?
-                collect(['sponsor' => $autoCategory->sponsor_text]) :
-                collect(['sponsor' => $sponsorAll->{SystemConfig::AUTO_SPONSOR}]);
+            if ($autoCategory) {
+                $custom = $autoCategory->sponsor_text
+                    ? collect(['sponsor' => $autoCategory->sponsor_text])
+                    : collect(['sponsor' => $sponsorAll->{SystemConfig::AUTO_SPONSOR}]);
+            }
         }
-
+    
+        // Merge custom data with categories
         $data = $custom->merge($categories);
-
+    
+        // Fetch ad details
+        $adDetail = AdDetail::where('ad_category', 'Shop')
+            ->where('ad_type', 1)
+            ->where('ad_content_type', 'Image')
+            ->first();
+    
+        // Check if ad exists and append it to the data
+        if ($adDetail) {
+            $img = url('storage/' . $adDetail->ad_image);
+            $adData = [
+                "id" => $adDetail->id,
+                "name" => $adDetail->ad_name,
+                "fullImage" => $img,
+                "ad_link" => $adDetail->ad_link,
+                "status" => $adDetail->status,
+                "ad_type" => $adDetail->ad_type,
+                "ad_category" => $adDetail->ad_category,
+                "ad_content_type" => $adDetail->ad_content_type,
+                "ad_video" => $adDetail->ad_video,
+                "sequence" => $adDetail->sequence,
+                "ad_description" => $adDetail->ad_description,
+                "adImageWidth" => 375,
+                "adImageHeight" => 160,
+            ];
+    
+            // Convert pagination data to an array and append the ad data
+            $categoriesArray = $categories->toArray();
+            $categoriesArray['data'][] = $adData;
+    
+            // Replace the merged data
+            $data = $custom->merge($categoriesArray);
+        }
+    
+        // Return the response
         return $this->genericSuccess($data);
-    }
+    }    
 
     /**
      * @param $categoryId
@@ -63,6 +106,34 @@ class AutoController extends ApiController
             ->whereHas('categories', function ($q) use ($categoryId) {
                 $q->where('auto_category_id', $categoryId);
             })->orderBy(DB::raw('sequence IS NULL, sequence'), 'asc')->paginate();
+
+            $adDetail = AdDetail::where('ad_category', 'Shop')
+            ->where('ad_type', 1)
+            ->where('ad_content_type', 'Image')
+            ->first();
+        
+        if ($adDetail) {
+            $img = url('storage/' . $adDetail->ad_image);
+            $adData = [
+                "id" => $adDetail->id,
+                "name" => $adDetail->ad_name,
+                "fullImage" => $img,
+                "ad_link" => $adDetail->ad_link,
+                "status" => $adDetail->status,
+                "ad_type" => $adDetail->ad_type,
+                "ad_category" => $adDetail->ad_category,
+                "ad_content_type" => $adDetail->ad_content_type,
+                "ad_video" => $adDetail->ad_video,
+                "sequence" => $adDetail->sequence,
+                "ad_description" => $adDetail->ad_description,
+                "adImageWidth" => 375,
+                "adImageHeight" => 160,
+            ];
+        
+            // Append ad data to the chat_ride collection
+            $place->push($adData);
+        }
+
 
         return $this->genericSuccess($place);
     }

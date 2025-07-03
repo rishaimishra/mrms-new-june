@@ -9,6 +9,7 @@ use App\Mail\RealEstateInterested;
 use App\Models\AdminUser;
 use App\Models\RealEstate;
 use App\Models\RealEstateCategory;
+use App\Models\AdDetail;
 use Eav\Attribute;
 use Eav\AttributeGroup;
 use Eav\AttributeSet;
@@ -37,6 +38,37 @@ class RealEstateController extends ApiController
                 collect(['sponsor' => $sponsorAll->{SystemConfig::REAL_STATE_SPONSOR}]);
         }
         $data = $custom->merge($categories);
+        $adDetail = AdDetail::where('ad_category', 'Shop')
+        ->where('ad_type', 1)
+        ->where('ad_content_type', 'Image')
+        ->first();
+
+    // Check if ad exists and append it to the data
+    if ($adDetail) {
+        $img = url('storage/' . $adDetail->ad_image);
+        $adData = [
+            "id" => $adDetail->id,
+            "name" => $adDetail->ad_name,
+            "fullImage" => $img,
+            "ad_link" => $adDetail->ad_link,
+            "status" => $adDetail->status,
+            "ad_type" => $adDetail->ad_type,
+            "ad_category" => $adDetail->ad_category,
+            "ad_content_type" => $adDetail->ad_content_type,
+            "ad_video" => $adDetail->ad_video,
+            "sequence" => $adDetail->sequence,
+            "ad_description" => $adDetail->ad_description,
+            "adImageWidth" => 375,
+            "adImageHeight" => 160,
+        ];
+
+        // Convert pagination data to an array and append the ad data
+        $categoriesArray = $categories->toArray();
+        $categoriesArray['data'][] = $adData;
+
+        // Replace the merged data
+        $data = $custom->merge($categoriesArray);
+    }
         return $this->genericSuccess($data);
     }
 

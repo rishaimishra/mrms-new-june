@@ -607,7 +607,7 @@
                         'X-CSRF-Token': "{{ csrf_token() }}"
                     },
                     type: 'GET',
-                    url: "{{url('/sl-admin/imageDelete/auto')}}/" + id,
+                    url: "{{url('/sl-admin/imageDeleteSeller/auto')}}/" + id,
                     success: function (data) {
 
                         $("#img" + id).css('display', 'none');
@@ -622,7 +622,7 @@
                         'X-CSRF-Token': "{{ csrf_token() }}"
                     },
                     type: 'GET',
-                    url: "{{url('/sl-admin/imagebgDelete/auto')}}/" + id,
+                    url: "{{url('/sl-admin/imagebgDeleteSeller/auto')}}/" + id,
                     success: function (data) {
 
                         $("#img" + id).css('display', 'none');

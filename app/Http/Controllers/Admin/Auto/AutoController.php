@@ -335,6 +335,7 @@ class AutoController extends AdminController
 
     public function imageDelete($id): JsonResponse
     {
+        return $id;
         //AutoImage::where('id',$id)->delete();
         $autoImage = AutoImage::findOrFail($id);
 

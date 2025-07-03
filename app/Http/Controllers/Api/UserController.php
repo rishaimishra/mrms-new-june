@@ -16,6 +16,7 @@ use App\Models\User;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use App\Models\AdDetail;
 use DB;
 
 use Twilio\Rest\Client; 
@@ -79,31 +80,27 @@ class UserController extends ApiController
     }
 
 
-    public function sendOtp($mobile_numbder,$otp) {
+    public function sendOtp($mobile_number, $otp)
+    {
+        $sid    = env('TWILIO_SID'); 
+        $token  = env('TWILIO_TOKEN'); 
+        $twilio_number = "+16185981277";
 
-            $sid    = getenv("TWILIO_SID"); 
-             
-            $token  = getenv("TWILIO_TOKEN"); 
-            $twilio_number = "+16185981277";
+        try {
+            $twilio = new Client($sid, $token); 
 
-            try{
-                $twilio = new Client($sid, $token); 
-            
-            $message = $twilio->messages->create($mobile_numbder, 
-                                    [
-                                        "messagingServiceSid" => "MGf47f8fe0c13f84488d726cdea4625dd7",      
-                                        "body" => "Seven Eleven EDSA set Password OTP: ".$otp 
-                                    ]); 
-                
-                dd("SMS Sent");
-                return;
-            }catch(Exception $e){
-                dd("Error ".$e);
-            }
-            
-            
+            $message = $twilio->messages->create($mobile_number, [
+                "messagingServiceSid" => "MGf47f8fe0c13f84488d726cdea4625dd7",      
+                "body" => "Seven Eleven EDSA set Password OTP: " . $otp 
+            ]); 
+
+            // Optionally log or return success
             return $message->sid;
-
+        } catch (\Exception $e) {
+            // Log the error for debugging
+            \Log::error('Twilio OTP send failed: ' . $e->getMessage());
+            return false;
+        }
     }
 
 
@@ -199,6 +196,35 @@ class UserController extends ApiController
 
     public function get_movie_doc(){
         $mobi_doc = MobiDocCategory::orderBy('sequence')->get();
+
+
+        // Fetch ad details
+        $adDetail = AdDetail::where('ad_category', 'Shop')
+        ->where('ad_type', 1)
+        ->where('ad_content_type', 'Image')
+        ->first();
+
+        if ($adDetail) {
+        $img = url('storage/' . $adDetail->ad_image);
+        $adData = [
+            "id" => $adDetail->id,
+            "name" => $adDetail->ad_name,
+            "fullImage" => $img,
+            "ad_link" => $adDetail->ad_link,
+            "status" => $adDetail->status,
+            "ad_type" => $adDetail->ad_type,
+            "ad_category" => $adDetail->ad_category,
+            "ad_content_type" => $adDetail->ad_content_type,
+            "ad_video" => $adDetail->ad_video,
+            "sequence" => $adDetail->sequence,
+            "ad_description" => $adDetail->ad_description,
+            "adImageWidth" => 375,
+            "adImageHeight" => 160,
+        ];
+
+        // Append ad data to the chat_ride collection
+        $mobi_doc->push($adData);
+        }
         if ($mobi_doc) {
             return $this->success("Movie Doc List", ['Mobi Doc' => $mobi_doc]);
         }else{
@@ -210,9 +236,39 @@ class UserController extends ApiController
     
     public function get_chat_a_ride(){
         $chat_ride = ChatARideCategory::orderBy('sequence')->get();
-        if ($chat_ride) {
+
+        // Fetch ad details
+        $adDetail = AdDetail::where('ad_category', 'Shop')
+            ->where('ad_type', 1)
+            ->where('ad_content_type', 'Image')
+            ->first();
+        
+        if ($adDetail) {
+            $img = url('storage/' . $adDetail->ad_image);
+            $adData = [
+                "id" => $adDetail->id,
+                "name" => $adDetail->ad_name,
+                "fullImage" => $img,
+                "ad_link" => $adDetail->ad_link,
+                "status" => $adDetail->status,
+                "ad_type" => $adDetail->ad_type,
+                "ad_category" => $adDetail->ad_category,
+                "ad_content_type" => $adDetail->ad_content_type,
+                "ad_video" => $adDetail->ad_video,
+                "sequence" => $adDetail->sequence,
+                "ad_description" => $adDetail->ad_description,
+                "adImageWidth" => 375,
+                "adImageHeight" => 160,
+            ];
+        
+            // Append ad data to the chat_ride collection
+            $chat_ride->push($adData);
+        }
+        
+        // Check if any categories (and ad data) are found and return appropriate response
+        if ($chat_ride->isNotEmpty()) {
             return $this->success("Chat A Ride List", ['Chat A Ride' => $chat_ride]);
-        }else{
+        } else {
             return $this->success("No Chat A Ride List Found");
         }
         
@@ -233,7 +289,33 @@ class UserController extends ApiController
                 ->orderBy('sequence')
                 ->get();
         }
-    
+        // Fetch ad details
+        $adDetail = AdDetail::where('ad_category', 'Shop')
+        ->where('ad_type', 1)
+        ->where('ad_content_type', 'Image')
+        ->first();
+
+        if ($adDetail) {
+        $img = url('storage/' . $adDetail->ad_image);
+        $adData = [
+            "id" => $adDetail->id,
+            "name" => $adDetail->ad_name,
+            "fullImage" => $img,
+            "ad_link" => $adDetail->ad_link,
+            "status" => $adDetail->status,
+            "ad_type" => $adDetail->ad_type,
+            "ad_category" => $adDetail->ad_category,
+            "ad_content_type" => $adDetail->ad_content_type,
+            "ad_video" => $adDetail->ad_video,
+            "sequence" => $adDetail->sequence,
+            "ad_description" => $adDetail->ad_description,
+            "adImageWidth" => 375,
+            "adImageHeight" => 160,
+        ];
+
+        // Append ad data to the mobi_doc collection
+        $mobi_doc->push($adData);
+        }
         // Check if any categories are found and return appropriate response
         if ($mobi_doc->isEmpty()) {
             return $this->success("No Service Category List Found");
@@ -466,11 +548,12 @@ class UserController extends ApiController
     }
     
     public function get_autos_category_seller(Request $request){
-        // return $request;
+        // Fetch seller IDs associated with auto category id 4
         $sellerIds = SellerCategory::where('auto_category_id', 4)->pluck('seller_id');
-
+    
         // Query the users table where the ID matches any of the seller IDs
         $users = User::with('seller_detail')->whereIn('id', $sellerIds)->get();
+    
         // Check if there are users and then process the images and sellertheme
         foreach ($users as $user) {
             // Access seller_detail for each user
@@ -481,21 +564,25 @@ class UserController extends ApiController
                 $sellertheme = SellerDetail::with(['themeRelations.theme'])
                                             ->where('user_id', $sellerDetail->user_id)
                                             ->get();
-    
+        
                 // Process sellertheme to only include the themeName with the full URL
                 $themeNames = $sellertheme->flatMap(function ($seller) {
                     return $seller->themeRelations->map(function ($relation) {
-                        // Modify the themeName to include the full path (URL)
+                        // Check if the theme exists before accessing its properties
                         if ($relation->theme) {
+                            // Modify the themeName to include the full path (URL)
                             $relation->theme->themeName = asset('storage/' . $relation->theme->theme_name);
+                            return $relation->theme->themeName;  // Return the modified themeName
+                        } else {
+                            // If theme doesn't exist, return null or a default value
+                            return null;
                         }
-                        return $relation->theme->themeName;  // Return the modified themeName
                     });
                 });
-    
+        
                 // Add the processed themeNames to the seller_detail array
-                $sellerDetail->sellertheme = $themeNames;
-                
+                $sellerDetail->sellertheme = $themeNames->filter();  // Remove any null values
+        
                 // Check if seller_detail exists and then set business registration image
                 if ($sellerDetail->business_registration_image) {
                     $sellerDetail->business_registration_image = asset('busniess_images/' . $sellerDetail->business_registration_image);
@@ -519,6 +606,7 @@ class UserController extends ApiController
             return $this->success("No Seller Found");
         }
     }
+    
     
     public function get_realestate_category_seller(Request $request) {
         // Fetch seller IDs for the given real estate category

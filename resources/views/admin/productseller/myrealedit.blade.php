@@ -6,9 +6,9 @@
 
 
     @isset($auto->id)
-        {!! Form::model($auto, ['files' => true, 'route' => ['admin.edit-auto.seller.save', $auto->id],'method' => 'POST']) !!}
+        {!! Form::model($auto, ['files' => true, 'route' => ['admin.update-property-seller', $auto->id],'method' => 'POST']) !!}
     @else
-        {!!Form::open(['route' => 'admin.auto.store','files' => true]) !!}
+        {!!Form::open(['route' => 'admin.real-estate.store','files' => true]) !!}
     @endisset
 
     <div class="row">
@@ -17,7 +17,7 @@
                 <div class="header">
                     <input type="hidden" name="auto_id" value="{{$auto->id}}">
                     <h2>
-                        {{ __("Add / Edit Auto") }}
+                        {{ __("Add / Edit Real Estate") }}
                         @isset($auto->id)
                             <div class="pull-right">
                                 {{ Form::button('Delete', ['type' => 'button', 'class' => 'btn btn-warning btn-sm delete'] )  }}
@@ -425,7 +425,7 @@
     {!! Form::close() !!}
 
     @isset($auto->id)
-        {!! Form::open(['route' => ['admin.auto.destroy', $auto->id], 'method' => 'DELETE','class'=>'delete','id'=>'deleteForm']) !!}
+        {!! Form::open(['route' => ['admin.real-estate.destroy', $auto->id], 'method' => 'DELETE','class'=>'delete','id'=>'deleteForm']) !!}
 
         {!! Form::close() !!}
     @endisset
@@ -607,7 +607,7 @@
                         'X-CSRF-Token': "{{ csrf_token() }}"
                     },
                     type: 'GET',
-                    url: "{{url('/sl-admin/imageDelete/auto')}}/" + id,
+                    url: "{{url('/sl-admin/imageDelete/real-estate-seller')}}/" + id,
                     success: function (data) {
 
                         $("#img" + id).css('display', 'none');

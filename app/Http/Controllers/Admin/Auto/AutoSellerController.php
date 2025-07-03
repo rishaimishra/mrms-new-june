@@ -14,6 +14,7 @@ use App\Models\User;
 use App\Models\AddressArea;
 use App\Models\AddressSection;
 use App\Models\AddressChiefdom;
+use App\Models\RealEstateImage;
 use Eav\Attribute;
 use Eav\AttributeGroup;
 use Eav\AttributeSet;
@@ -47,8 +48,7 @@ class AutoSellerController extends AdminController
 
   
 
-        $attributes = 
-            Attribute::where('entity_id', 1)->get();
+        $attributes = Attribute::where('entity_id', 1)->get();
     
         // Retrieve all auto categories for the category selection
         $autoCategories = AutoCategory::all();
@@ -131,96 +131,175 @@ class AutoSellerController extends AdminController
     $attributeSets = AttributeSet::where('entity_id', self::ENTITY_ID)->pluck('attribute_set_name', 'attribute_set_id');
     return view('admin.productseller.myautoedit', compact('categories', 'auto', 'attributeGroups', 'attributeSets'));
     }
-
     public function MyAutoeditsave(Request $request, Auto $auto)
-    {
-        $auto = Auto::findOrFail($request->auto_id);
+{
+    // Retrieve the Auto instance
+    $auto = Auto::findOrFail($request->auto_id);
 
-        if ($request->input('attribute_set_id')) {
-            $auto->attribute_set_id = $request->input('attribute_set_id');
-            $auto->save();
-        }
+    // Update basic fields
+    $auto->title = $request->input('title');
+    $auto->name = $request->name;
+    $auto->about = $request->input('about', '');
+    $auto->map_addresses = $request->address ?? '';
+    $auto->latitude = $request->latitude;
+    $auto->longitude = $request->longitude;
+    $auto->availability_times = json_decode($request->input('availability_times', ''));
+    $auto->meta_tag1 = $request->input('meta_tag1', '');
+    $auto->meta_tag2 = $request->input('meta_tag2', '');
+    $auto->meta_tag3 = $request->input('meta_tag3', '');
+    $auto->sequence = $request->input('sequence', '');
+    $auto->is_available = $request->is_available;
 
-        $attributeGroups = $this->getAttributes($auto);
-
-        $additionalRules = $attributeGroups->flatMap(function (AttributeGroup $attributeGroup) {
-            return $attributeGroup->attributes->map(function (Attribute $attribute) {
-                return [
-                    $attribute->attribute_code => [$attribute->is_required ? 'required' : 'nullable', 'string']
-                ];
-            });
-        })->toArray();
-
-        // $this->validator($request, $additionalRules, true)->validate();
-        
-        $attributeValues = $attributeGroups->flatMap(function (AttributeGroup $attributeGroup) {
-            return $attributeGroup->attributes->pluck('attribute_code')->map(function ($code) {
-                return [$code => \request($code)];
-            });
-        })->toArray();
-
-        
-        $digitalAddresses = $this->generateDigitalAddress($request); //EP002 24.585188 73.709946
-
-        $auto->digital_addresses = $digitalAddresses ?? 0;
-        $auto->title = $request->input('title');
-        $auto->name = $request->name;
-        $auto->about = $request->input('about', '');
-        $auto->type = Auto::TYPE_PLACE;
-        $auto->map_addresses = $request->address ?? '';
-        $auto->latitude = $request->latitude;
-        $auto->longitude = $request->longitude;
-        $auto->availability_times = json_decode(stripslashes($request->input('availability_times', '')));
-        $auto->meta_tag1 = $request->input('meta_tag1', '');
-        $auto->meta_tag2 = $request->input('meta_tag2', '');
-        $auto->meta_tag3 = $request->input('meta_tag3', '');
-        $auto->sequence = $request->input('sequence', '');
-        $auto->is_available = $request->is_available;
-        if ($request->hasFile('background_image')) {
-            $file = $request->file('background_image');
-            // Get the original filename
-            $filename = time() . '.' . $file->getClientOriginalExtension();
-            // Save the image in the 'public/images' folder
-            $file->move(public_path('product_background_images'), $filename);
-
-            // You can also store the path to the database if needed
-            // Image::create(['path' => 'images/' . $filename]);
-            $auto->background_image = $filename;
-        }
-        $auto->address()->associate($request->address_id);
-        $auto->addressArea()->associate($request->address_area_id);
-        $auto->addressChiefdom()->associate($request->address_chiefdom_id);
-        $auto->addressSection()->associate($request->address_section_id);
-
-        $auto->save();
-
-        $auto->digital_addresses = $auto->digital_addresses . "-" . $auto->id;
-        $auto->categories()->sync($request->categories);
-
-        foreach ($attributeValues as $key => $attr) {
-
-            $field = array_keys($attr)[0];
-            $val = $attr[$field];
-
-            $auto->{$field} = $val;
-        }
-
-        $auto->save();
-
-        if ($request->hasFile('images')) {
-
-            if ((count($request->images)) > 20) {
-                return redirect()->back()->with($this->setMessage('You can not upload branch images more then 20', self::MESSAGE_ERROR))->withInput();
-            }
-
-            foreach ($request->images as $image) {
-                //$path = \Storage::disk('public')->putFile('place', $image);
-                $path = $this->resizeImage($image, 'auto', 800);
-                $auto->images()->create(['image' => $path]);
-            }
-        }
-        return redirect()->route('admin.edit-seller-product')->with($this->setMessage('Auto Update Successfully', self::MESSAGE_SUCCESS));
+    // Handle the background image file upload
+    if ($request->hasFile('background_image')) {
+        $file = $request->file('background_image');
+        $filename = time() . '.' . $file->getClientOriginalExtension();
+        $file->move(public_path('product_background_images'), $filename);
+        $auto->background_image = $filename;
     }
+
+    // Update relationships
+    $auto->address()->associate($request->address_id);
+    $auto->addressArea()->associate($request->address_area_id);
+    $auto->addressChiefdom()->associate($request->address_chiefdom_id);
+    $auto->addressSection()->associate($request->address_section_id);
+
+    // Save initial changes
+    $auto->save();
+
+    // Update digital address
+    $digitalAddresses = $this->generateDigitalAddress($request); // Example: EP002 24.585188 73.709946
+    $auto->digital_addresses = ($digitalAddresses ?? 0) . "-" . $auto->id;
+
+    // Update categories
+    $auto->categories()->sync($request->categories);
+
+    // Process and update attribute values
+    $attributeGroups = $this->getAttributes($auto);
+    $attributeValues = $attributeGroups->flatMap(function ($attributeGroup) {
+        return $attributeGroup->attributes->pluck('attribute_code')->map(function ($code) {
+            return [$code => request($code)];
+        });
+    })->toArray();
+
+    foreach ($attributeValues as $key => $attr) {
+        $field = array_keys($attr)[0];
+        $val = $attr[$field];
+        $auto->{$field} = $val;
+    }
+
+    // Save the auto with updated attributes
+    $auto->save();
+
+    // Handle multiple images upload
+    if ($request->hasFile('images')) {
+        if (count($request->images) > 20) {
+            return redirect()->back()->with(
+                $this->setMessage('You cannot upload more than 20 images', self::MESSAGE_ERROR)
+            )->withInput();
+        }
+
+        foreach ($request->images as $image) {
+            $path = $this->resizeImage($image, 'auto', 800);
+            $auto->images()->create(['image' => $path]);
+        }
+    }
+
+    // Redirect with success message
+    return redirect()->route('admin.edit-seller-product')->with(
+        $this->setMessage('Auto updated successfully', self::MESSAGE_SUCCESS)
+    );
+}
+    // public function MyAutoeditsave(Request $request, Auto $auto)
+    // {
+    //     return $request;
+    //     $auto = Auto::findOrFail($request->auto_id);
+
+    //     if ($request->input('attribute_set_id')) {
+    //         $auto->attribute_set_id = $request->input('attribute_set_id');
+    //         $auto->save();
+    //     }
+
+    //     $attributeGroups = $this->getAttributes($auto);
+
+    //     $additionalRules = $attributeGroups->flatMap(function (AttributeGroup $attributeGroup) {
+    //         return $attributeGroup->attributes->map(function (Attribute $attribute) {
+    //             return [
+    //                 $attribute->attribute_code => [$attribute->is_required ? 'required' : 'nullable', 'string']
+    //             ];
+    //         });
+    //     })->toArray();
+
+    //     // $this->validator($request, $additionalRules, true)->validate();
+        
+    //     $attributeValues = $attributeGroups->flatMap(function (AttributeGroup $attributeGroup) {
+    //         return $attributeGroup->attributes->pluck('attribute_code')->map(function ($code) {
+    //             return [$code => \request($code)];
+    //         });
+    //     })->toArray();
+
+        
+    //     $digitalAddresses = $this->generateDigitalAddress($request); //EP002 24.585188 73.709946
+
+    //     $auto->digital_addresses = $digitalAddresses ?? 0;
+    //     $auto->title = $request->input('title');
+    //     $auto->name = $request->name;
+    //     $auto->about = $request->input('about', '');
+    //     $auto->type = Auto::TYPE_PLACE;
+    //     $auto->map_addresses = $request->address ?? '';
+    //     $auto->latitude = $request->latitude;
+    //     $auto->longitude = $request->longitude;
+    //     $auto->availability_times = json_decode(stripslashes($request->input('availability_times', '')));
+    //     $auto->meta_tag1 = $request->input('meta_tag1', '');
+    //     $auto->meta_tag2 = $request->input('meta_tag2', '');
+    //     $auto->meta_tag3 = $request->input('meta_tag3', '');
+    //     $auto->sequence = $request->input('sequence', '');
+    //     $auto->is_available = $request->is_available;
+    //     if ($request->hasFile('background_image')) {
+    //         $file = $request->file('background_image');
+    //         // Get the original filename
+    //         $filename = time() . '.' . $file->getClientOriginalExtension();
+    //         // Save the image in the 'public/images' folder
+    //         $file->move(public_path('product_background_images'), $filename);
+
+    //         // You can also store the path to the database if needed
+    //         // Image::create(['path' => 'images/' . $filename]);
+    //         $auto->background_image = $filename;
+    //     }
+    //     $auto->address()->associate($request->address_id);
+    //     $auto->addressArea()->associate($request->address_area_id);
+    //     $auto->addressChiefdom()->associate($request->address_chiefdom_id);
+    //     $auto->addressSection()->associate($request->address_section_id);
+
+    //     $auto->save();
+
+    //     $auto->digital_addresses = $auto->digital_addresses . "-" . $auto->id;
+    //     $auto->categories()->sync($request->categories);
+
+    //     foreach ($attributeValues as $key => $attr) {
+
+    //         $field = array_keys($attr)[0];
+    //         $val = $attr[$field];
+
+    //         $auto->{$field} = $val;
+    //     }
+
+    //     $auto->save();
+
+    //     if ($request->hasFile('images')) {
+
+    //         if ((count($request->images)) > 20) {
+    //             return redirect()->back()->with($this->setMessage('You can not upload branch images more then 20', self::MESSAGE_ERROR))->withInput();
+    //         }
+
+    //         foreach ($request->images as $image) {
+    //             //$path = \Storage::disk('public')->putFile('place', $image);
+    //             $path = $this->resizeImage($image, 'auto', 800);
+    //             $auto->images()->create(['image' => $path]);
+    //         }
+    //     }
+    //     return redirect()->route('admin.edit-seller-product')->with($this->setMessage('Auto Update Successfully', self::MESSAGE_SUCCESS));
+    // }
 
     protected function getAttributes(Auto $auto)
     {
@@ -290,5 +369,121 @@ class AutoSellerController extends AdminController
     return view('admin.productseller.myrealedit', compact('categories', 'auto', 'attributeGroups', 'attributeSets'));
    
     }
+    public function updateProperty(Request $request, RealEstate $realEstate)
+    {
+       // Retrieve the RealEstate instance
+    $realEstate = RealEstate::findOrFail($request->auto_id);
 
+    // Check and update the attribute_set_id if provided
+    if ($request->input('attribute_set_id')) {
+        $realEstate->attribute_set_id = $request->input('attribute_set_id');
+        $realEstate->save();
+    }
+
+    // Retrieve and process attribute groups
+    $attributeGroups = $this->getAttributesReal($realEstate);
+
+    // Generate attribute values dynamically
+    $attributeValues = $attributeGroups->flatMap(function (AttributeGroup $attributeGroup) {
+        return $attributeGroup->attributes->pluck('attribute_code')->map(function ($code) {
+            return [$code => request($code)];
+        });
+    })->toArray();
+
+    // Update fields
+    $digitalAddresses = $this->generateDigitalAddress($request); // Example: EP002 24.585188 73.709946
+    $realEstate->digital_addresses = $digitalAddresses ?? 0;
+    $realEstate->title = $request->input('title');
+    $realEstate->name = $request->name;
+    $realEstate->about = $request->input('about', '');
+    $realEstate->map_addresses = $request->address ?? '';
+    $realEstate->latitude = $request->latitude;
+    $realEstate->longitude = $request->longitude;
+    $realEstate->availability_times = json_decode(stripslashes($request->input('availability_times', '')));
+    $realEstate->meta_tag1 = $request->input('meta_tag1', '');
+    $realEstate->meta_tag2 = $request->input('meta_tag2', '');
+    $realEstate->meta_tag3 = $request->input('meta_tag3', '');
+    $realEstate->sequence = $request->input('sequence', '');
+    $realEstate->is_available = $request->is_available;
+
+    // Handle relationships
+    $realEstate->address()->associate($request->address_id);
+    $realEstate->addressArea()->associate($request->address_area_id);
+    $realEstate->addressChiefdom()->associate($request->address_chiefdom_id);
+    $realEstate->addressSection()->associate($request->address_section_id);
+
+    // Update dynamic attributes
+    foreach ($attributeValues as $attr) {
+        $field = array_keys($attr)[0];
+        $val = $attr[$field];
+        $realEstate->{$field} = $val;
+    }
+
+    // Save the updated model
+    $realEstate->save();
+
+    // Update digital address with ID
+    $realEstate->digital_addresses = $realEstate->digital_addresses . "-" . $realEstate->id;
+
+    // Update categories
+    $realEstate->categories()->sync($request->categories);
+
+    // Save the final model
+    $realEstate->save();
+
+    // Handle image uploads
+    if ($request->hasFile('images')) {
+        if ((count($request->images)) > 20) {
+            return redirect()->back()->with(
+                $this->setMessage('You cannot upload more than 20 images', self::MESSAGE_ERROR)
+            )->withInput();
+        }
+
+        foreach ($request->images as $image) {
+            $path = $this->resizeImage($image, 'realstate', 800);
+            $realEstate->images()->create(['image' => $path]);
+        }
+    }
+
+   
+
+        return redirect()->route('admin.show-realestate-product-list')->with($this->setMessage('Real Estate Update successfully', self::MESSAGE_SUCCESS));
+    }
+
+    public function imageDelete($id)
+    {
+        // return $id;
+        //AutoImage::where('id',$id)->delete();
+        $autoImage = AutoImage::findOrFail($id);
+
+        if ($autoImage->image) {
+            Storage::disk('public')->delete($autoImage->image);
+        }
+
+        $autoImage->delete();
+
+        return response()->json(['status' => true]);
+    }
+
+    public function imagebgDelete($id)
+    {
+        //AutoImage::where('id',$id)->delete();
+        $autobgImage = Auto::findOrFail($id);
+
+        $autobgImage->background_image = null;
+
+        $autobgImage->save();
+
+        return response()->json(['status' => true]);
+    }
+    public function realSellerImagedelete($id){
+        $realEstateImage = RealEstateImage::findOrFail($id);
+
+        if ($realEstateImage->image) {
+            \Storage::disk('public')->delete($realEstateImage->image);
+        }
+        $realEstateImage->delete();
+
+        return response()->json(['status' => true]);
+    }
 }

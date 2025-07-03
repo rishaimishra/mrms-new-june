@@ -12,6 +12,7 @@ use App\Models\SellerCategory;
 use App\Models\ProductImage;
 use App\Models\Auto;
 use App\Models\AutoCategory;
+use App\Models\RealEstate;
 
 use Eav\Attribute;
 use Eav\AttributeGroup;
@@ -24,7 +25,10 @@ use DB;
 class ProductSellerController extends Controller
 {
     const ENTITY_ID = 3;
-
+    public function PropertyIndexList(){
+        $MyAutos = RealEstate::all();
+       return view('admin.productseller.sellerrealestatelist',compact('MyAutos'));
+    }
     public function index()
     {
         $userId = auth()->id();
@@ -219,7 +223,7 @@ class ProductSellerController extends Controller
         $parentCategories = fetchCategoriesWithChildren($categories, null);
         return view('admin.productseller.realestatelist', compact('sellerCategories', 'parentCategories'));
     }
-    
+   
     
     
     public function Myindex()

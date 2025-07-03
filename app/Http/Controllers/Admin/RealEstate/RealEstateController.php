@@ -217,6 +217,7 @@ class RealEstateController extends AdminController
 
     public function update(Request $request, RealEstate $realEstate)
     {
+        
         if ($request->input('attribute_set_id')) {
             $realEstate->attribute_set_id = $request->input('attribute_set_id');
             $realEstate->save();
